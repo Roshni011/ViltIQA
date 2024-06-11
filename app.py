@@ -2,7 +2,6 @@ import streamlit as st
 from PIL import Image
 import requests
 from io import BytesIO
-pip install transformers
 from transformers import ViltProcessor, ViltForQuestionAnswering
 
 # Set page layout to wide
