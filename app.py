@@ -1,53 +1,58 @@
+```python
 import streamlit as st
 from PIL import Image
-import requests
-from io import BytesIO
 from transformers import ViltProcessor, ViltForQuestionAnswering
+import torch
 
-# Set page layout to wide
-st.set_page_config(layout="wide")
+# Configure Streamlit page
+st.set_page_config(page_title="VQA with ViLT", layout="wide")
 
-processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
-model = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+# Load ViLT processor and model
+@st.cache_resource
+def load_model():
+    processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+    model = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+    return processor, model, device
 
-def get_answer(image, text):
+processor, model, device = load_model()
+
+# Function to get answer from model
+def get_answer(image: Image.Image, question: str):
     try:
-        # Load and process the image
-        img = Image.open(BytesIO(image)).convert("RGB")
-
-        # Prepare inputs
-        encoding = processor(img, text, return_tensors="pt")
-
-        # Forward pass
-        outputs = model(**encoding)
-        logits = outputs.logits
-        idx = logits.argmax(-1).item()
-        answer = model.config.id2label[idx]
-
-        return answer
-
+        encoding = processor(image, question, return_tensors="pt").to(device)
+        with torch.no_grad():
+            outputs = model(**encoding)
+            logits = outputs.logits
+            probs = torch.softmax(logits, dim=-1)
+            idx = logits.argmax(-1).item()
+            answer = model.config.id2label[idx]
+            confidence = probs[0, idx].item()
+        return answer, confidence
     except Exception as e:
-        return str(e)
+        return str(e), 0.0
 
-# Set up the Streamlit app
-st.title("Visual Question Answering")
-st.write("Upload an image and enter a question to get an answer.")
+# Streamlit UI
+st.title("🖼️ Visual Question Answering (ViLT)")
+st.write("Upload an image and ask a question about it.")
 
-# Create columns for image upload and input fields
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 1])
 
-# Image upload
 with col1:
     uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
-    st.image(uploaded_file, use_column_width=True)
+    image = None
+    if uploaded_file:
+        image = Image.open(uploaded_file).convert("RGB")
+        st.image(image, caption="Uploaded Image", use_column_width=True)
 
-# Question input
 with col2:
-    question = st.text_input("Question")
-
-    # Process the image and question when both are provided
-    if uploaded_file and question is not None:
+    question = st.text_input("Enter your question")
+    if image is not None and question:
         if st.button("Ask Question"):
+            answer, confidence = get_answer(image, question)
+            st.success(f"Answer: {answer}")
+            st.caption(f"Confidence: {confidence:.2f}")
             image = Image.open(uploaded_file)
             image_byte_array = BytesIO()
             image.save(image_byte_array, format='JPEG')
@@ -58,3 +63,4 @@ with col2:
 
             # Display the answer
             st.success("Answer: " + answer)
+
