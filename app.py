@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 from PIL import Image
 from transformers import ViltProcessor, ViltForQuestionAnswering
@@ -63,4 +62,5 @@ with col2:
 
             # Display the answer
             st.success("Answer: " + answer)
+
 
