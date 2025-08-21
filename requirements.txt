@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+transformers>=4.42.0
+torch # or torch==<cuda-matched-version>
+Pillow
+numpy
+faiss-cpu # if you have CUDA, you can use faiss-gpu
+sentence-transformers
+pydantic
+python-multipart # to handle file uploads in FastAPI
